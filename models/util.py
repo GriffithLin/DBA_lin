@@ -55,7 +55,7 @@ class PositionalEncoding(nn.Module):
 
 
 class AttentionEncode(nn.Module):
-    def __init__(self, dropout, embedding_size, num_heads):
+    def __init__(self, dropout, embedding_size, num_heads, max_seqlen):
         super(AttentionEncode, self).__init__()
         self.dropout = dropout
         self.embedding_size = embedding_size
@@ -70,7 +70,7 @@ class AttentionEncode(nn.Module):
         #                               num_hiddens=self.embedding_size,
         #                               num_heads=self.num_heads,
         #                               dropout=self.dropout)
-        self.addNorm1 = AddNorm(normalized=[50, self.embedding_size], dropout=self.dropout)
+        self.addNorm1 = AddNorm(normalized=[max_seqlen, self.embedding_size], dropout=self.dropout)
 
         self.FFN = PositionWiseFFN(ffn_num_input=64, ffn_num_hiddens=192, ffn_num_outputs=64)
 

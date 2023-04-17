@@ -12,13 +12,16 @@ def get_config():
     # 数据参数
     parse.add_argument('-max_length', type=int, default=260,
                        help='Maximum length of peptide sequence')
-    parse.add_argument('-vocab_size', type=int, default=21,
+    parse.add_argument('-vocab_size', type=int, default=4**6+1,
                        help='The size of the vocabulary')
     parse.add_argument('-output_size', type=int, default=1,
                        help='Number of peptide functions')
 
     parse.add_argument('-k_mer', type=int, default=0,
                        help='k of k-mer input data')
+
+    parse.add_argument('-divide_validata', type=bool, default=False,
+                       help='divide 20% traindata to validata ')
 
     # 训练参数
     parse.add_argument('-model_num', type=int, default=1,
@@ -27,7 +30,8 @@ def get_config():
                        help='Batch size')
     parse.add_argument('-epochs', type=int, default=200)
     parse.add_argument('-learning_rate', type=float, default=0.0018)
-    parse.add_argument('-threshold', type=float, default=0.55)
+    parse.add_argument('-threshold', type=float, default=0.5)
+    parse.add_argument('-early_stop', type=int, default=10)
 
     # 模型参数
     parse.add_argument('-model_name', type=str, default='TextCNN',

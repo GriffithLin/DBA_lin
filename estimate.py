@@ -7,7 +7,11 @@
 # import
 from sklearn.metrics import matthews_corrcoef,f1_score
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import precision_recall_curve,auc
+from sklearn.metrics import precision_recall_curve,auc, accuracy_score
+
+
+# def auc(score_label, Y_True, threshold=0.55):
+
 
 # TP FP TN FN Total (%) Sens Spec LR+ LR− PPV NPV AUC MCC
 
@@ -23,9 +27,11 @@ def evaluate(score_label, Y_True, threshold=0.55):
             score_label[i] = 1
     y_hat = score_label
 
+    acc = accuracy_score(Y_True, y_hat)
+
     tn, fp, fn, tp = confusion_matrix(Y_True, y_hat).ravel()
-    evl_result = {"tn":tn, "fp":fp, "fn":fn, "tp":tp}
-    precision, recall, thresholds = precision_recall_curve(Y_True, y_hat)
+    evl_result = {"tp":tp, "fp":fp, "tn":tn,"fn":fn , "total":tn + fp + fn + tp }
+    precision, recall, thresholds = precision_recall_curve(Y_True, score_label)
     # print("Matthews相关系数: "+str(matthews_corrcoef(Y_True,y_hat)))
     # print('sensitivity/recall:',tp/(tp+fn))
     # print('specificity:',tn/(tn+fp))
@@ -46,6 +52,6 @@ def evaluate(score_label, Y_True, threshold=0.55):
     false_positive_rate = fp / (tn + fp)
     false_discovery_rate= fp / (tp + fp)
 
-    evl_result.update({"Sens":Sens, "Spec": specificity, "PPV":PPV, "NPV":NPV, "AUC":auc_precision_recall, "MCC":mcc})
+    evl_result.update({"Sens":Sens, "Spec": specificity, "PPV":PPV, "NPV":NPV, "AUC":auc_precision_recall, "MCC":mcc, "acc":acc})
 
     return evl_result

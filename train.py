@@ -10,7 +10,9 @@ import math
 import numpy as np
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import LambdaLR
-
+from sklearn.metrics import accuracy_score, precision_recall_curve,auc
+import os
+import shutil
 
 class DataTrain:
     def __init__(self, model, optimizer, criterion, scheduler=None, device="cuda"):
@@ -20,19 +22,27 @@ class DataTrain:
         self.lr_scheduler = scheduler
         self.device = device
 
-    def train_step(self, train_iter, epochs=None, model_num=0):
+    def train_step(self, train_iter, epochs=None, model_num=0, early_stop = 10000, threshold = 0.55):
         steps = 1
+        best_loss = 100000.
+        best_loss_acc = 0.
+        bestlos_epoch = 0
+        PATH = os.getcwd()
+        best_model = os.path.join(PATH, 'saved_models', 'best.pth')
         for epoch in range(1, epochs + 1):
             start_time = time.time()
             total_loss = 0
             alpha = 0.4
             for train_data, train_label in train_iter:
+                # print(train_data.shape)
                 self.model.train()  # 进入训练模式
                 # 使数据与模型在同一设备中
                 train_data, train_label = train_data.to(self.device), train_label.to(self.device)
                 # 模型预测
+
                 y_hat = self.model(train_data)
                 # 计算损失
+                # unsqueeze插入一个维度
                 loss = self.criterion(y_hat, train_label.float().unsqueeze(1))
 
                 # 清空之前的梯度
@@ -54,12 +64,118 @@ class DataTrain:
                 total_loss += loss.item()
                 steps += 1
 
+
+
+            end_time = time.time()
+            epoch_time = end_time - start_time
+
+            model_predictions, true_labels = predict(self.model, train_iter, device=self.device)
+            for i in range(len(model_predictions)):
+                if model_predictions[i] < threshold:  # threshold
+                    model_predictions[i] = 0
+                else:
+                    model_predictions[i] = 1
+            y_hat = model_predictions
+            acc1 = accuracy_score(true_labels, y_hat)
+
+            print(f'Model {model_num+1}|Epoch:{epoch:003} | Time:{epoch_time:.2f}s')
+            print(f'Train loss:{total_loss / len(train_iter)}')
+            print(f'Train acc:{acc1}')
+
+            train_loss = total_loss / len(train_iter)
+            if train_loss < best_loss:
+                torch.save(self.model.state_dict(), best_model)
+                best_loss = train_loss
+                best_loss_acc = acc1
+                bestlos_epoch = epoch
+
+
+            if (best_loss < train_loss) and (epoch - bestlos_epoch >= early_stop):
+                break
+
+
+
+        self.model.load_state_dict(torch.load(best_model))
+        print("best_loss = " + str(best_loss))
+        print("best_loss_acc = " + str(best_loss_acc))
+
+    def train_step_val(self, train_iter, val_iter, epochs=None, model_num=0, early_stop = 10000, threshold=0.55):
+        print("train with val")
+        steps = 1
+        bestlos_acc1 = 0.
+        best_loss = 100000
+        bestlos_epoch = 0
+        PATH = os.getcwd()
+        latest_model = os.path.join(PATH, 'saved_models', 'latest.pth')
+        best_model = os.path.join(PATH, 'saved_models', 'best.pth')
+        for epoch in range(1, epochs + 1):
+            start_time = time.time()
+            total_loss = 0
+            alpha = 0.4
+            for train_data, train_label in train_iter:
+                # print(train_data.shape)
+                self.model.train()  # 进入训练模式
+                # 使数据与模型在同一设备中
+                train_data, train_label = train_data.to(self.device), train_label.to(self.device)
+                # 模型预测
+
+                y_hat = self.model(train_data)
+                # 计算损失
+                # unsqueeze插入一个维度
+                loss = self.criterion(y_hat, train_label.float().unsqueeze(1))
+
+                # 清空之前的梯度
+                self.optimizer.zero_grad()
+                # 反向传播损失
+                loss.backward()
+                # 更新参数
+                self.optimizer.step()
+
+                if self.lr_scheduler:
+                    if self.lr_scheduler.__module__ == lr_scheduler.__name__:
+                        # Using PyTorch In-Built scheduler
+                        self.lr_scheduler.step()
+                    else:
+                        # Using custom defined scheduler
+                        for param_group in self.optimizer.param_groups:
+                            param_group['lr'] = self.lr_scheduler(steps)
+
+                total_loss += loss.item()
+                steps += 1
+
+            # self.model.eval()
+            model_predictions, true_labels = predict(self.model, val_iter, device=self.device)
+
+            for i in range(len(model_predictions)):
+                if model_predictions[i] < threshold:  # threshold
+                    model_predictions[i] = 0
+                else:
+                    model_predictions[i] = 1
+            y_hat = model_predictions
+            acc1 = accuracy_score(true_labels, y_hat)
+            train_loss = total_loss / len(train_iter)
+
+            torch.save(self.model.state_dict(), latest_model)
+            # latest
+            if train_loss < best_loss:
+                shutil.copy(latest_model, best_model)
+                bestlos_epoch = epoch
+                bestlos_acc1 = acc1
+                best_loss = train_loss
+
             end_time = time.time()
             epoch_time = end_time - start_time
 
             print(f'Model {model_num+1}|Epoch:{epoch:002} | Time:{epoch_time:.2f}s')
             print(f'Train loss:{total_loss / len(train_iter)}')
+            print(f'Train acc:{acc1}')
 
+            if (best_loss < train_loss) and (epoch - bestlos_epoch >= early_stop):
+                break
+
+        print("best_loss = {:3.1f}".format(best_loss))
+        print("best_loss_acc = {:3.1f}".format(bestlos_acc1))
+        self.model.load_state_dict(torch.load(best_model))
 
 def predict(model, data, device="cuda"):
     # 模型预测
